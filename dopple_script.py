@@ -18,6 +18,29 @@ GB_UNITS = float(1000000000)
 
 DEFAULT_GRAPHNAME = "plot.png"
 
+SIZE_B = 1.0
+SIZE_KB = 1024.0
+SIZE_MB = 1.0e6
+SIZE_GB = 1.0e9
+SIZE_TB = 1.0e12
+SIZE_PB = 1.0e15
+
+LABEL_B  = "B"
+LABEL_KB = "KB"
+LABEL_MB = "MB"
+LABEL_GB = "GB"
+LABEL_TB = "TB"
+LABEL_PB = "PB"
+
+byteScales = {
+    'B': SIZE_B,
+    'KB': SIZE_KB,
+    'MB': SIZE_MB,
+    'GB': SIZE_GB,
+    'TB': SIZE_TB,
+    'PB': SIZE_PB
+}
+
 def PrintHelp():
     cmdLineParts = sys.argv[0].split('/')
     for elements in cmdLineParts:
@@ -77,6 +100,27 @@ def ParseCommandLineArgs():
 
     return isOk, filename, graphname
 
+def GetScale(bytes):
+
+    label = ""
+    size = 0
+
+    if bytes < SIZE_KB:
+        label = LABEL_B
+    elif bytes < SIZE_MB:
+        label = LABEL_KB
+    elif bytes < SIZE_GB:
+        label = LABEL_MB
+    elif bytes < SIZE_TB:
+        label = LABEL_GB
+    elif bytes < SIZE_PB:
+        label = LABEL_TB
+    else:
+        label = LABEL_PB
+
+    return label
+
+
 def PlotFiles(filelist, axes):
     global colorIndex
     datasets = []
@@ -84,21 +128,39 @@ def PlotFiles(filelist, axes):
     curRow = 0
     curCol = 0
     for line in filelist:
-        print line
-        graphData = LoadData(line.strip())
-        labelParts = line.split(".")
-        if '/' in labelParts[0]:
-            graphLabel = labelParts[0].split('/')[-1]
+        graphData, readScale, writeScale = LoadData(line.strip())
+
+        if line.strip().find("seq") != -1:
+            graphLabel = "sequential"
         else:
-            graphLabel = labelParts[0]
+            graphLabel = "random"
+
+        if line.strip().find("nore") != -1:
+            graphLabel = graphLabel + ", noreuse"
+        elif line.strip().find("will") != -1:
+            graphLabel = graphLabel + ", willneed"
+        else:
+            graphLabel = graphLabel + ", dontneed"
+
+#        labelParts = line.split(".")
+#        if '/' in labelParts[0]:
+#            graphLabel = labelParts[0].split('/')[-1]
+#        else:
+#            graphLabel = labelParts[0]
         if len(graphData[2]) > 0:
 #                ax1 = plt.subplot2grid((3,3), (0,0), colspan=3)
             ax1 = axes[curCol][curRow]
 #                ax1 = fig.add_subplot(grid[0], grid[1], grid[2])
-#                ax1.set_xlabel("GB transferred", color='black')
-#                ax1.set_ylabel("Seconds per transfer chunk", color='black')
+            totalTime = sum(graphData[1])
+#            print graphData[1]
+            ax1.set_xlabel("%.03f %s in %.03f sec" % (graphData[0][-1], readScale, totalTime), color='black', fontsize=5)
+#            ax1.set_ylabel("Seconds per transfer chunk", color='black', fontsize=5)
             ax1.grid(True)
-            ax1.plot(graphData[0], graphData[1], colors[colorIndex], label=graphLabel)
+            if len(graphData[0]) < 15:
+                markerType = '.'
+            else:
+                markerType = ''
+            ax1.plot(graphData[0], graphData[1], colors[colorIndex], label=graphLabel, marker=markerType)
             ax1.locator_params(axis = 'y', nbins = 4)
             for tick in ax1.xaxis.get_major_ticks():
                 tick.label.set_fontsize(6)
@@ -116,10 +178,18 @@ def PlotFiles(filelist, axes):
             ax2 = axes[curCol][curRow + 1]
 #                ax2 = fig.add_subplot(grid[0], grid[1], grid[2])
             curCol = curCol + 1
-#                ax2.set_xlabel("GB transferred", color='black')
-#                ax2.set_ylabel("Seconds per transfer chunk", color='black')
+#            print
+#            print graphData[3]
+            totalTime = sum(graphData[3])
+#            ax2.set_xlabel("GB transferred", color='black', fontsize=5)
+            ax2.set_xlabel("%.03f %s in %.03f sec" % ( graphData[2][-1], writeScale, totalTime), color='black', fontsize=5)
+#            ax2.set_ylabel("Seconds per transfer chunk", color='black', fontsize=5)
             ax2.grid(True)
-            ax2.plot(graphData[2], graphData[3], colors[colorIndex], label=graphLabel)
+            if len(graphData[2]) < 15:
+                markerType = '.'
+            else:
+                markerType = ''
+            ax2.plot(graphData[2], graphData[3], colors[colorIndex], label=graphLabel, marker=markerType)
             ax2.locator_params(axis = 'y', nbins = 4)
             for bytes, time in zip(graphData[2], graphData[3]):
                 if Decimal(time) <= Decimal(0.0):
@@ -146,21 +216,48 @@ def PlotFiles(filelist, axes):
 
         colorIndex = colorIndex + 1
 
-def CreateData(line, totalBytes):
+def CreateData(line, totalBytes, totalTime, scale):
     parts = line.split()
     if len(parts) == 3:
         time = float(parts[1])
-        size = float(parts[2]) / GB_UNITS
+        size = float(parts[2]) / float(byteScales[scale])
         totalBytes = totalBytes + size
+        totalTime = totalTime + time
         type = 0
 
     if len(parts) == 4:
         time = float(parts[2])
-        size = float(parts[3]) / GB_UNITS
+        size = float(parts[3]) / float(byteScales[scale])
         totalBytes = totalBytes + size
+        totalTime = totalTime + time
         type = int(parts[1]) - 1
 
-    return time, totalBytes, type
+    return time, totalTime, totalBytes, type
+
+def FindScale(file):
+    readBytes = 0
+    writtenBytes = 0
+
+    for line in file.readlines():
+        parts = line.split()
+        if len(parts) == 3:
+            if int(parts[2]) > writtenBytes:
+                writtenBytes = int(parts[2])
+
+        if len(parts) == 4:
+            if (int(parts[1]) - 1) == 0:
+                if int(parts[3]) > readBytes:
+                    readBytes = int(parts[3])
+            else:
+                if int(parts[3]) > writtenBytes:
+                    writtenBytes = int(parts[3])
+
+
+    readScale = GetScale(readBytes)
+    writeScale = GetScale(writtenBytes)
+
+    return readScale, writeScale
+
 
 def LoadData(filename):
     graphData = [[], [], [], []]
@@ -168,35 +265,25 @@ def LoadData(filename):
     sizes = []
     bytesPerSec = []
     transferAmount = []
-    totalTime = 0.0
+    totalTimeRead = 0.0
+    totalTimeWritten = 0.0
     totalBytesRead = 0.0
     totalBytesWritten = 0.0
     i = 0
     with open(filename, 'r') as file:
+        readScale, writeScale = FindScale(file)
+        file.seek(0)
         for line in file.readlines():
             if i % 2:
-                time, totalBytesWritten, type = CreateData(line, totalBytesWritten)
+                time, totalTimeWritten, totalBytesWritten, type = CreateData(line, totalBytesWritten, totalTimeWritten, writeScale)
                 graphData[(type * 2)].append(totalBytesWritten)
                 graphData[(type * 2) + 1].append(time)
             else :
-                time, totalBytesRead, type = CreateData(line, totalBytesRead)
+                time, totalTimeRead, totalBytesRead, type = CreateData(line, totalBytesRead, totalTimeRead, readScale)
                 graphData[(type * 2)].append(totalBytesRead)
                 graphData[(type * 2) + 1].append(time)
             i = i + 1
-#                totalTime = totalTime + float(parts[1])
-#                times.append(totalTime)
-#                times.append(float(parts[1]))
-#                size = float(parts[2]) / GB_UNITS
-#                sizes.append(size)
-#                totalBytes = totalBytes + size
-#                transferAmount.append(totalBytes)
-#                if Decimal(parts[1]) > 0.0:
-#                    bytesPerSec.append((int(parts[2]) / float(parts[1])))
-#                    bytesPerSec.append((int(parts[2]) / float(parts[1])))
-#                else:
-#                    bytesPerSec.append(0)
-
-    return graphData
+    return graphData, readScale, writeScale
 
 
 def PlotEverything(filelist, graphFilename):
@@ -204,7 +291,7 @@ def PlotEverything(filelist, graphFilename):
     fig.text(0.25, 0.97, "Read", horizontalalignment='center')
     fig.text(0.75, 0.97, "Write", horizontalalignment='center')
     fig.text(0.01, 0.5, "time per transfer", fontsize = 10, rotation='vertical', verticalalignment='center')
-    fig.text(0.5, 0.01, "GB transferred", fontsize = 10, horizontalalignment='center')
+    fig.text(0.5, 0.01, "data transferred", fontsize = 10, horizontalalignment='center')
     fig.tight_layout()
     PlotFiles(filelist, axes)
     plt.savefig(graphFilename, dpi=300)
@@ -222,6 +309,16 @@ def CleanUp(list):
     for file in list:
         os.unlink(file)
 
+def CheckForDopple():
+    rc = 0
+    if not os.path.exists("dopple"):
+        makeProc = subprocess.Popen("make", stdout=subprocess.PIPE)
+        streamdata = makeProc.communicate()[0]
+        rc = makeProc.returncode
+    else:
+        print "Executable present"
+
+    return rc
 
 isOk, data_filename, graph_filename = ParseCommandLineArgs()
 datafile_list = []
@@ -229,17 +326,20 @@ args = [ "-s -n", "-s -w", "-s -d", "-r -n", "-r -w", "-r -d" ]
 count = 0
 # run the copy, collecting the filenames
 if isOk:
-    with open(data_filename, 'r') as datafile:
-        for line in datafile.readlines():
-            if ( count < len(args) ):
+    if CheckForDopple() == 0:
+        with open(data_filename, 'r') as datafile:
+            for line in datafile.readlines():
+                if ( count < len(args) ):
 
-                datafile_list.append(RunTest(line.strip(), args[count]))
-                count = count + 1
-            else:
-                print "Skipping %s" % line.strip()
+                    datafile_list.append(RunTest(line.strip(), args[count]))
+                    count = count + 1
+                else:
+                    print "Skipping %s" % line.strip()
 
-    # plot
-    PlotEverything(datafile_list, graph_filename)
-    CleanUp(datafile_list)
+        # plot
+        PlotEverything(datafile_list, graph_filename)
+        CleanUp(datafile_list)
+    else:
+        print "Unable to build executable, exiting"
 else:
     PrintHelp()

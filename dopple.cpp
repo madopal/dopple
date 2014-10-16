@@ -109,22 +109,22 @@ double get_scale(off_t size, char*label, int label_size)
 	double  tmpSize = 1.0;
 
 	if (size < SIZE_KB){
-		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, "B");
+		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, LABEL_B);
 		tmpSize = SIZE_B;
 	} else if (size < SIZE_MB){
-		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, "KB");
+		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, LABEL_KB);
 		tmpSize = SIZE_KB;
 	} else if (size < SIZE_GB){
-		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, "MB");
+		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, LABEL_MB);
 		tmpSize = SIZE_MB;
 	} else if (size < SIZE_TB){
-		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, "GB");
+		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, LABEL_GB);
 		tmpSize = SIZE_GB;
 	} else if (size < SIZE_PB){
-		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, "TB");
+		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, LABEL_TB);
 		tmpSize = SIZE_TB;
 	} else {
-		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, "PB");
+		snprintf(tmpLabel, TMP_LABEL_SIZE - 1, LABEL_PB);
 		tmpSize = SIZE_PB;
 	}
 
@@ -278,8 +278,8 @@ int test_file_copy(char* source_filename, char* dest_filename, int posix_advice_
 	}
 	stop_timer(total_timer);
 	double elapsed = timer_elapsed(total_timer);
-	print_xfer_stats(elapsed, write_file_size);
 	write_file_size = fsize(write_file);
+	print_xfer_stats(elapsed, write_file_size);
 	files_verified = (write_file_size == read_file_size);
 	close(read_file);
 	close(write_file);
