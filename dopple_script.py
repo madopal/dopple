@@ -3,6 +3,7 @@
 import os, sys
 from decimal import *
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import matplotlib.patches as mpatches
@@ -53,8 +54,9 @@ def PrintHelp():
     print ""
     print "usage: %s [options]" % scriptName
     print "Options:"
-    print "  --filename [FILENAME] filename of list file for data (mandatory to run, 6 files should be given)"
-    print "  --graphname [FILENAME] filename of output graph (defaults to %s, will overwrite existing)" % DEFAULT_GRAPHNAME
+    print "  --filename [FILENAME] - filename of list file for data (mandatory to run, 6 files should be given)"
+    print "  --graphname [FILENAME] - filename of output graph (defaults to %s, will overwrite existing)" % DEFAULT_GRAPHNAME
+    print "  --graphonly - only does the graphing, using the filename as a list of files to graph"
     print "  --help - this help"
 
     return
@@ -69,6 +71,7 @@ def ParseCommandLineArgs():
     isOk = False
     verbose = False
     findall = False
+    graphonly = False
     filename = ""
     graphname = DEFAULT_GRAPHNAME
 
@@ -85,6 +88,8 @@ def ParseCommandLineArgs():
                     gettingFilename = True
                 elif not arg.find("--graphname"):
                     gettingGraphname = True
+                elif not arg.find("--graphonly"):
+                    graphonly = True
                 elif not arg.find("--Belgium"):
                     print "** Watch your language! **"
             else:
@@ -98,7 +103,7 @@ def ParseCommandLineArgs():
     if (len(filename) > 0):
         isOk = True
 
-    return isOk, filename, graphname
+    return isOk, filename, graphname, graphonly
 
 def GetScale(bytes):
 
@@ -320,21 +325,25 @@ def CheckForDopple():
 
     return rc
 
-isOk, data_filename, graph_filename = ParseCommandLineArgs()
+isOk, data_filename, graph_filename, graphonly = ParseCommandLineArgs()
 datafile_list = []
 args = [ "-s -n", "-s -w", "-s -d", "-r -n", "-r -w", "-r -d" ]
 count = 0
 # run the copy, collecting the filenames
 if isOk:
     if CheckForDopple() == 0:
-        with open(data_filename, 'r') as datafile:
-            for line in datafile.readlines():
-                if ( count < len(args) ):
-
-                    datafile_list.append(RunTest(line.strip(), args[count]))
-                    count = count + 1
-                else:
-                    print "Skipping %s" % line.strip()
+        if graphonly == False:
+            with open(data_filename, 'r') as datafile:
+                for line in datafile.readlines():
+                    if ( count < len(args) ):
+                        datafile_list.append(RunTest(line.strip(), args[count]))
+                        count = count + 1
+                    else:
+                        print "Skipping %s" % line.strip()
+        else:
+            with open(data_filename, 'r') as datafile:
+                for line in datafile.readlines():
+                    datafile_list.append(line.strip())
 
         # plot
         PlotEverything(datafile_list, graph_filename)
