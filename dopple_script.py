@@ -16,6 +16,67 @@ colorIndex = 0
 MB_UNITS = float(1000000)
 GB_UNITS = float(1000000000)
 
+DEFAULT_GRAPHNAME = "plot.png"
+
+def PrintHelp():
+    cmdLineParts = sys.argv[0].split('/')
+    for elements in cmdLineParts:
+        if elements.find(".py"):
+            scriptName = elements
+
+    print ""
+    print "** %s **" % scriptName
+    print "A program to copy files and get performance data from the copy"
+    print ""
+    print "usage: %s [options]" % scriptName
+    print "Options:"
+    print "  --filename [FILENAME] filename of list file for data (mandatory to run, 6 files should be given)"
+    print "  --graphname [FILENAME] filename of output graph (defaults to %s, will overwrite existing)" % DEFAULT_GRAPHNAME
+    print "  --help - this help"
+
+    return
+
+def DebugPrint(string, verbose):
+    if verbose:
+        print string
+
+    return
+
+def ParseCommandLineArgs():
+    isOk = False
+    verbose = False
+    findall = False
+    filename = ""
+    graphname = DEFAULT_GRAPHNAME
+
+    # temp flags
+    gettingFilename = False
+    gettingGraphname = False
+
+    if len(sys.argv) >= 2:
+        for arg in sys.argv:
+            if not arg.find("--"):
+                if not arg.find("--help"):
+                    PrintHelp()
+                elif not arg.find("--filename"):
+                    gettingFilename = True
+                elif not arg.find("--graphname"):
+                    gettingGraphname = True
+                elif not arg.find("--Belgium"):
+                    print "** Watch your language! **"
+            else:
+                if gettingFilename:
+                    filename = arg.strip()
+                    gettingFilename = False
+                if gettingGraphname:
+                    graphname = arg.strip()
+                    gettingGraphname = False
+
+    if (len(filename) > 0):
+        isOk = True
+
+    return isOk, filename, graphname
+
 def PlotFiles(filelist, axes):
     global colorIndex
     datasets = []
@@ -138,77 +199,47 @@ def LoadData(filename):
     return graphData
 
 
-
 def PlotEverything(filelist, graphFilename):
-    #times, sizes, bytesPerSec, transferAmount = LoadData(sys.argv[1])
-    #fig = plt.figure()
     fig, axes = plt.subplots(nrows=6, ncols=2)
     fig.text(0.25, 0.97, "Read", horizontalalignment='center')
     fig.text(0.75, 0.97, "Write", horizontalalignment='center')
     fig.text(0.01, 0.5, "time per transfer", fontsize = 10, rotation='vertical', verticalalignment='center')
     fig.text(0.5, 0.01, "GB transferred", fontsize = 10, horizontalalignment='center')
     fig.tight_layout()
-
-
-    #dates,values = zip(*items)
-
-
-    #plt.plot(times, sizes, 'o-')
-    #plt.plot(transferAmount, times, '-')
     PlotFiles(filelist, axes)
-
     plt.savefig(graphFilename, dpi=300)
 
 
 def RunTest(filename, opts):
-    args = "./copy_test -f %s %s" % ( filename, opts)
+    args = "./dopple -f %s %s" % ( filename, opts)
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
     (out, err) = proc.communicate()
 #    print out
     return out.strip()
+
 
 def CleanUp(list):
     for file in list:
         os.unlink(file)
 
 
-data_filename = sys.argv[1]
-graphFilename = sys.argv[2]
+isOk, data_filename, graph_filename = ParseCommandLineArgs()
 datafile_list = []
 args = [ "-s -n", "-s -w", "-s -d", "-r -n", "-r -w", "-r -d" ]
 count = 0
 # run the copy, collecting the filenames
-#args = ['./copy_test', '-f /home/flynn/devel/Parcel/test/big_data/parcelTest005.dat', '-s', '-d']
-with open(data_filename, 'r') as datafile:
-    for line in datafile.readlines():
-        if ( count < len(args) ):
+if isOk:
+    with open(data_filename, 'r') as datafile:
+        for line in datafile.readlines():
+            if ( count < len(args) ):
 
-            datafile_list.append(RunTest(line.strip(), args[count]))
-            count = count + 1
-        else:
-            print "Skipping %s" % line.strip()
+                datafile_list.append(RunTest(line.strip(), args[count]))
+                count = count + 1
+            else:
+                print "Skipping %s" % line.strip()
 
-# plot
-PlotEverything(datafile_list, graphFilename)
-CleanUp(datafile_list)
-#datafile_list.append(RunTest("/home/flynn/devel/Parcel/test/large_data/parcelTest005.dat", "-s -n"))
-#datafile_list.append(RunTest("/home/flynn/devel/Parcel/test/large_data/parcelTest005.dat", "-s -w"))
-#datafile_list.append(RunTest("/home/flynn/devel/Parcel/test/large_data/parcelTest005.dat", "-s -d"))
-#datafile_list.append(RunTest("/home/flynn/devel/Parcel/test/large_data/parcelTest005.dat", "-r -n"))
-#datafile_list.append(RunTest("/home/flynn/devel/Parcel/test/large_data/parcelTest005.dat", "-r -w"))
-#datafile_list.append(RunTest("/home/flynn/devel/Parcel/test/large_data/parcelTest005.dat", "-r -d"))
-
-#args = "./copy_test -f /home/flynn/devel/Parcel/test/big_data/parcelTest005.dat -s -d"
-#proc = subprocess.Popen(args, stdout=subprocess.PIPE, shell=True)
-#(out, err) = proc.communicate()
-#print "stdout:"
-#print out
-#print "stderr:"
-#print err
-
-# create the list file
-
-# plot
-#PlotEverything(listFile, graphFilename)
-
-
+    # plot
+    PlotEverything(datafile_list, graph_filename)
+    CleanUp(datafile_list)
+else:
+    PrintHelp()

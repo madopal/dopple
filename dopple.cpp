@@ -216,7 +216,7 @@ int test_file_copy(char* source_filename, char* dest_filename, int posix_advice_
 	// open the existing file
 	read_file = open(source_filename, read_mode);
 	// open the target location
-	write_file = open(dest_filename, write_mode);
+	write_file = open(dest_filename, write_mode, S_IRUSR | S_IWUSR);
 
 	if ( (read_file != -1) & (write_file != -1) ) {
 		// get the file size

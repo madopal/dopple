@@ -1,0 +1,18 @@
+# ignore generated map files
+*.map
+
+# ignore any created log files
+*.log
+
+# ignore any link files
+*.o
+
+# ignore any text files
+*.txt
+
+# ignore any images
+*.png
+
+# ignore app
+dopple
+
